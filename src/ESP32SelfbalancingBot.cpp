@@ -1,4 +1,5 @@
 #define DEBUG_OSC
+#define DEBUG_SPEED
 #define DEBUG
 
 #include <Arduino.h>
@@ -107,11 +108,13 @@ void processOSCMsg()
 		{
 #ifdef DEBUG_OSC
 			DB_PRINTLN("OSCmove_mode positionControlMode = true");
-			DB_PRINT("M ");
+			DB_PRINT("OSCmove_speed:");
 			DB_PRINT(OSCmove_speed);
-			DB_PRINT(" ");
+			DB_PRINT(",");
+			DB_PRINT("OSCmove_steps1:");
 			DB_PRINT(OSCmove_steps1);
 			DB_PRINT(",");
+			DB_PRINT("OSCmove_steps2:");
 			DB_PRINTLN(OSCmove_steps2);
 #endif			
 			positionControlMode = true;
@@ -130,9 +133,9 @@ void processOSCMsg()
 			else
 				steering = (-steering * steering + 0.5 * steering) * max_steering;
 #ifdef DEBUG_OSC
-			DB_PRINT("OSC throttle: ");
+			DB_PRINT("OSC throttle:");
 			DB_PRINTLN(throttle);
-			DB_PRINT("OSC steering: ");
+			DB_PRINT("OSC steering:");
 			DB_PRINTLN(steering);
 #endif			
 		}
@@ -183,13 +186,16 @@ void processOSCMsg()
 
 #ifdef DEBUG_OSC
 		DB_PRINTLN("OSC modifing control parameters");
-		DB_PRINT("Par: ");
+		DB_PRINT("Kp_user:");
 		DB_PRINT(Kp_user);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("Kd_user:");
 		DB_PRINT(Kd_user);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("Kp_thr_user:");
 		DB_PRINT(Kp_thr_user);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("Ki_thr_user:");
 		DB_PRINTLN(Ki_thr_user);
 #endif
 
@@ -245,12 +251,16 @@ void loop()
 			angle_adjusted_filtered = angle_adjusted_filtered * 0.99 + MPU_sensor_angle * 0.01;
 
 #ifdef DEBUG_IMU
+		DB_PRINT("dt:");
 		DB_PRINT(dt);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("angle_offset:");
 		DB_PRINT(angle_offset);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("angle_adjusted:");
 		DB_PRINT(angle_adjusted);
 		DB_PRINT(",");
+		DB_PRINT("angle_adjusted_filtered:");
 		DB_PRINTLN(angle_adjusted_filtered);
 #endif
 		// We calculate the estimated robot speed:
@@ -262,8 +272,10 @@ void loop()
 		estimated_speed_filtered = estimated_speed_filtered * 0.9 + (float)estimated_speed * 0.1; // low pass filter on estimated speed
 
 #ifdef DEBUG_ESTIMATED_SPEED
+		DB_PRINT("angle_adjusted:");
 		DB_PRINT(angle_adjusted);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("estimated_speed_filtered:");
 		DB_PRINTLN(estimated_speed_filtered);
 #endif
 
@@ -286,10 +298,13 @@ void loop()
 		target_angle = constrain(target_angle, -max_target_angle, max_target_angle); // limited output
 
 #ifdef DEBUG_SPEED
+		DB_PRINT("angle_adjusted:");
 		DB_PRINT(angle_adjusted);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("estimated_speed_filtered:");
 		DB_PRINT(estimated_speed_filtered);
-		DB_PRINT(" ");
+		DB_PRINT(",");
+		DB_PRINT("target_angle:");
 		DB_PRINTLN(target_angle);
 #endif
 
@@ -397,7 +412,7 @@ void loop()
 		if (sendBattery_counter >= 3)
 		{ // Every 3 seconds we send a message
 			sendBattery_counter = 0;
-			DB_PRINT("B");
+			DB_PRINT("BatteryValue:");
 			DB_PRINTLN(BatteryValue);
 			char auxS[25];
 			sprintf(auxS, "$tB,%04d", BatteryValue);
