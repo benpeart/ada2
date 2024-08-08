@@ -23,8 +23,8 @@
 
 // Global MPU6050 IMU variables
 accel_t_gyro_union accel_t_gyro;
-float x_gyro_value; // in deg/seg units
-float x_gyro_offset = 0.0;
+float y_gyro_value; // in deg/seg units
+float y_gyro_offset = 0.0;
 float accel_angle; // in degree units
 float angle;
 
@@ -38,21 +38,21 @@ uint8_t swap;
 // This function implements a complementary filter to fusion gyro and accel info
 float MPU6050_getAngle(float dt)
 {
-  accel_angle = atan2f((float)accel_t_gyro.value.y_accel, (float)accel_t_gyro.value.z_accel) * RAD2GRAD;
-  x_gyro_value = (accel_t_gyro.value.x_gyro - x_gyro_offset) / 65.5; // Accel scale at 500deg/seg  => 65.5 LSB/deg/s
+  accel_angle = atan2f((float)-accel_t_gyro.value.x_accel, (float)accel_t_gyro.value.z_accel) * RAD2GRAD;
+  y_gyro_value = (accel_t_gyro.value.y_gyro - y_gyro_offset) / 65.5; // Accel scale at 500deg/seg  => 65.5 LSB/deg/s
 
   // Complementary filter
   // We integrate the gyro rate value to obtain the angle in the short term and we take the accelerometer angle with a low pass filter in the long term...
-  angle = 0.99 * (angle + x_gyro_value * dt) + 0.01 * accel_angle; // Time constant = 0.99*0.01(100hz)/(1-0.99) = 0.99, around 1 sec.
+  angle = 0.99 * (angle + y_gyro_value * dt) + 0.01 * accel_angle; // Time constant = 0.99*0.01(100hz)/(1-0.99) = 0.99, around 1 sec.
 
   // Gyro bias correction
   // We supose that the long term mean of the gyro_value should tend to zero (gyro_offset). This means that the robot is not continuosly rotating.
-  int16_t correction = constrain(accel_t_gyro.value.x_gyro, x_gyro_offset - 10, x_gyro_offset + 10); // limit corrections...
-  x_gyro_offset = x_gyro_offset * 0.9995 + correction * 0.0005;                                      // Time constant of this correction is around 20 sec.
+  int16_t correction = constrain(accel_t_gyro.value.y_gyro, y_gyro_offset - 10, y_gyro_offset + 10); // limit corrections...
+  y_gyro_offset = y_gyro_offset * 0.9995 + correction * 0.0005;                                      // Time constant of this correction is around 20 sec.
 
   // Serial.print(angle);
   // Serial.print(" ");
-  // Serial.println(x_gyro_offset);
+  // Serial.println(y_gyro_offset);
 
   return angle;
 }
@@ -74,8 +74,8 @@ void MPU6050_calibrate()
     for (i = 0; i < 100; i++)
     {
       MPU6050_read_3axis();
-      values[i] = accel_t_gyro.value.x_gyro;
-      value += accel_t_gyro.value.x_gyro;
+      values[i] = accel_t_gyro.value.y_gyro;
+      value += accel_t_gyro.value.y_gyro;
       delay(25);
     }
     // mean value
@@ -94,9 +94,9 @@ void MPU6050_calibrate()
     else
       Serial.println("Repeat, DONT MOVE!");
   }
-  x_gyro_offset = value;
+  y_gyro_offset = value;
   // Take the first reading of angle from accels
-  angle = atan2f((float)accel_t_gyro.value.y_accel, (float)accel_t_gyro.value.z_accel) * RAD2GRAD;
+  angle = atan2f((float)-accel_t_gyro.value.x_accel, (float)accel_t_gyro.value.z_accel) * RAD2GRAD;
 }
 
 void MPU6050_setup()
