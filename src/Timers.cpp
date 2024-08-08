@@ -17,45 +17,6 @@
 #include "driver/timer.h"
 #include "esp32-hal-timer.h"
 
-void delay_1us()
-{
-	for (uint8_t k = 0; k < 20; k++)
-	{
-		__asm__ __volatile__(
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop"
-			"\n\t"
-			"nop");
-	}
-}
-
 extern "C"
 {
 
@@ -70,7 +31,7 @@ extern "C"
 		{
 			// We generate 1us STEP pulse
 			digitalWrite(PIN_MOTOR1_STEP, HIGH);
-			delay_1us();
+			delayMicroseconds(1);
 
 			if (dir_M1 > 0)
 				steps1--;
@@ -90,7 +51,7 @@ extern "C"
 		{
 			// We generate 1us STEP pulse
 			digitalWrite(PIN_MOTOR2_STEP, HIGH);
-			delay_1us();
+			delayMicroseconds(1);
 
 			if (dir_M2 > 0)
 				steps2--;
