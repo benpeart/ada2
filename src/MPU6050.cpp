@@ -7,6 +7,9 @@
 
 #include "MPU6050.h"
 #include "Wire.h"
+#include "debug.h"
+
+#define DEBUG_IMU
 
 // BROBOT EVO 2 by JJROBOTS
 // SELF BALANCE ARDUINO ROBOT WITH STEPPER MOTORS
@@ -50,9 +53,19 @@ float MPU6050_getAngle(float dt)
   int16_t correction = constrain(accel_t_gyro.value.y_gyro, y_gyro_offset - 10, y_gyro_offset + 10); // limit corrections...
   y_gyro_offset = y_gyro_offset * 0.9995 + correction * 0.0005;                                      // Time constant of this correction is around 20 sec.
 
-  // Serial.print(angle);
-  // Serial.print(" ");
-  // Serial.println(y_gyro_offset);
+#ifdef DEBUG_IMU
+  DB_PRINT("accel_angle:");
+  DB_PRINT(accel_angle);
+
+  DB_PRINT(", y_gyro_value:");
+  DB_PRINT(y_gyro_value);
+
+  DB_PRINT(", angle:");
+  DB_PRINT(angle);
+
+  DB_PRINT(", y_gyro_offset:");
+  DB_PRINT(y_gyro_offset);
+#endif
 
   return angle;
 }
@@ -69,14 +82,15 @@ void MPU6050_calibrate()
   delay(500);
   while (!gyro_cal_ok)
   {
-    Serial.println("Gyro calibration... DONT MOVE!");
-    // we take 100 measurements in 4 seconds
+    DB_PRINTLN("Gyro calibration... DONT MOVE!");
+    // we take 100 unique measurements
     for (i = 0; i < 100; i++)
     {
       MPU6050_read_3axis();
       values[i] = accel_t_gyro.value.y_gyro;
       value += accel_t_gyro.value.y_gyro;
-      delay(25);
+      while (!MPU6050_newData())
+        ;
     }
     // mean value
     value = value / 100;
@@ -85,18 +99,25 @@ void MPU6050_calibrate()
     for (i = 0; i < 100; i++)
       dev += (values[i] - value) * (values[i] - value);
     dev = sqrt((1 / 100.0) * dev);
-    Serial.print("offset: ");
-    Serial.print(value);
-    Serial.print("  stddev: ");
-    Serial.println(dev);
     if (dev < 50.0)
       gyro_cal_ok = true;
     else
-      Serial.println("Repeat, DONT MOVE!");
+      DB_PRINTLN("Repeat, DONT MOVE!");
   }
   y_gyro_offset = value;
   // Take the first reading of angle from accels
   angle = atan2f((float)-accel_t_gyro.value.x_accel, (float)accel_t_gyro.value.z_accel) * RAD2GRAD;
+
+#ifdef DEBUG_IMU
+  DB_PRINT("mean:");
+  DB_PRINT(value);
+
+  DB_PRINT(", stddev: ");
+  DB_PRINT(dev);
+
+  DB_PRINT(", angle:");
+  DB_PRINTLN(angle);
+#endif
 }
 
 void MPU6050_setup()
@@ -110,7 +131,7 @@ void MPU6050_setup()
   Serial.print(c, HEX);
   Serial.print(", error = ");
   Serial.println(error, DEC);
-#endif  
+#endif
 
   // RESET chip
   MPU6050_write_reg(MPU6050_PWR_MGMT_1, bit(MPU6050_DEVICE_RESET));
@@ -204,13 +225,13 @@ void MPU6050_read_1axis()
   SWAP(accel_t_gyro.reg.z_accel_h, accel_t_gyro.reg.z_accel_l);
   SWAP(accel_t_gyro.reg.x_gyro_h, accel_t_gyro.reg.x_gyro_l);
 
-/*
-  // Print values
-  Serial.print("axis:");
-  Serial.print(accel_t_gyro.value.y_accel, DEC);
-  Serial.print(",");
-  Serial.println(accel_t_gyro.value.x_gyro, DEC);
-  */
+  /*
+    // Print values
+    Serial.print("axis:");
+    Serial.print(accel_t_gyro.value.y_accel, DEC);
+    Serial.print(",");
+    Serial.println(accel_t_gyro.value.x_gyro, DEC);
+    */
 }
 
 // return true on new data available

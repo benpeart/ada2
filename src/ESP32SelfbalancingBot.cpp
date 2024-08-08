@@ -1,6 +1,53 @@
-#define DEBUG_OSC
-#define DEBUG_SPEED
-#define DEBUG
+// BROBOT EVO 2 by JJROBOTS
+// SELF BALANCE ARDUINO ROBOT WITH STEPPER MOTORS CONTROLLED WITH YOUR SMARTPHONE
+// JJROBOTS BROBOT KIT: (Arduino Leonardo + BROBOT ELECTRONIC BRAIN SHIELD + STEPPER MOTOR drivers)
+// This code is prepared for the ESP32
+// Author: JJROBOTS.COM
+// Date: 02/09/2014
+// Updated: 25/06/2017
+// Version: 2.82
+// License: GPL v2
+// Compiled and tested with Arduino 1.6.8. This new version of code does not need external libraries (only Arduino standard libraries)
+// Project URL: http://jjrobots.com/b-robot-evo-2-much-more-than-a-self-balancing-robot (Features,documentation,build instructions,how it works, SHOP,...)
+// New updates:
+//   - New default parameters specially tuned for BROBOT EVO 2 version (More agile, more stable...)
+//   - New Move mode with position control (for externally programming the robot with a Blockly or pyhton programming interfaces)
+//   - New telemtry packets send to TELEMETRY IP for monitoring Battery, Angle, ... (old battery packets for touch osc not working now)
+//   - Default telemetry server is 192.168.4.2 (first client connected to the robot)
+//  Get the free android app (jjrobots) from google play. For IOS users you need to use TouchOSC App + special template (info on jjrobots page)
+//  Thanks to our users on the forum for the new ideas. Specially sasa999, KomX, ...
+
+// The board needs at least 10-15 seconds with no motion (robot steady) at beginning to give good values... Robot move slightly when it´s ready!
+// MPU6050 IMU connected via I2C bus. Angle estimation using complementary filter (fusion between gyro and accel)
+// Angle calculations and control part is running at 100Hz
+
+// The robot is OFF when the angle is high (robot is horizontal). When you start raising the robot it
+// automatically switch ON and start a RAISE UP procedure.
+// You could RAISE UP the robot also with the robot arm servo (Servo button on the interface)
+// To switch OFF the robot you could manually put the robot down on the floor (horizontal)
+
+// We use a standard PID controllers (Proportional, Integral derivative controller) for robot stability
+// More info on the project page: How it works page at jjrobots.com
+// We have a PI controller for speed control and a PD controller for stability (robot angle)
+// The output of the control (motors speed) is integrated so it´s really an acceleration not an speed.
+
+// We control the robot from a WIFI module using OSC standard UDP messages
+// You need an OSC app to control de robot (Custom free JJRobots APP for android, and TouchOSC APP for IOS)
+// Join the module Wifi Access Point (by default: JJROBOTS_XX) with your Smartphone/Tablet...
+//   Wifi password: 87654321
+// For TouchOSC users (IOS): Install the BROBOT layout into the OSC app (Touch OSC) and start play! (read the project page)
+// OSC controls:
+//    fader1: Throttle (0.0-1.0) OSC message: /1/fader1
+//    fader2: Steering (0.0-1.0) OSC message: /1/fader2
+//    push1: Move servo arm (and robot raiseup) OSC message /1/push1 
+//    if you enable the touchMessage on TouchOSC options, controls return to center automatically when you lift your fingers
+//    PRO mode (PRO button). On PRO mode steering and throttle are more aggressive
+//    PAGE2: PID adjustements [optional][dont touch if you dont know what you are doing...;-) ]
+
+//#define DEBUG_OSC
+#define DEBUG_IMU
+//#define DEBUG_ESTIMATED_SPEED
+//#define DEBUG_SPEED
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -27,7 +74,7 @@ void initTimers();
 
 void initWifiAP()
 {
-	// DB_PRINTLN("Setting up WiFi AP...");
+	DB_PRINTLN("Setting up WiFi AP...");
 	if (WiFi.softAP("bbot", "12345678"))
 	{
 		DB_PRINTLN("Wifi AP set up successfully");
@@ -134,9 +181,9 @@ void processOSCMsg()
 				steering = (-steering * steering + 0.5 * steering) * max_steering;
 #ifdef DEBUG_OSC
 			DB_PRINT("OSC throttle:");
-			DB_PRINTLN(throttle);
-			DB_PRINT("OSC steering:");
-			DB_PRINTLN(steering);
+			DB_PRINT(throttle);
+			DB_PRINT(", OSC steering:");
+			DB_PRINT(steering);
 #endif			
 		}
 
@@ -251,17 +298,17 @@ void loop()
 			angle_adjusted_filtered = angle_adjusted_filtered * 0.99 + MPU_sensor_angle * 0.01;
 
 #ifdef DEBUG_IMU
-		DB_PRINT("dt:");
-		DB_PRINT(dt);
-		DB_PRINT(",");
-		DB_PRINT("angle_offset:");
+		DB_PRINT(", MPU_sensor_angle:");
+		DB_PRINT(MPU_sensor_angle);
+
+		DB_PRINT(", angle_offset:");
 		DB_PRINT(angle_offset);
-		DB_PRINT(",");
-		DB_PRINT("angle_adjusted:");
+
+		DB_PRINT(", angle_adjusted:");
 		DB_PRINT(angle_adjusted);
-		DB_PRINT(",");
-		DB_PRINT("angle_adjusted_filtered:");
-		DB_PRINTLN(angle_adjusted_filtered);
+
+		DB_PRINT(", angle_adjusted_filtered:");
+		DB_PRINT(angle_adjusted_filtered);
 #endif
 		// We calculate the estimated robot speed:
 		// Estimated_Speed = angular_velocity_of_stepper_motors(combined) - angular_velocity_of_robot(angle measured by IMU)
@@ -272,11 +319,16 @@ void loop()
 		estimated_speed_filtered = estimated_speed_filtered * 0.9 + (float)estimated_speed * 0.1; // low pass filter on estimated speed
 
 #ifdef DEBUG_ESTIMATED_SPEED
-		DB_PRINT("angle_adjusted:");
-		DB_PRINT(angle_adjusted);
-		DB_PRINT(",");
-		DB_PRINT("estimated_speed_filtered:");
-		DB_PRINTLN(estimated_speed_filtered);
+		DB_PRINT(", speed_M1:");
+		DB_PRINT(speed_M1);
+		DB_PRINT(", speed_M2:");
+		DB_PRINT(speed_M2);
+		DB_PRINT(", actual_robot_speed:");
+		DB_PRINT(actual_robot_speed);
+		DB_PRINT(", angular_velocity:");
+		DB_PRINT(angular_velocity);
+		DB_PRINT(", estimated_speed_filtered:");
+		DB_PRINT(estimated_speed_filtered);
 #endif
 
 		if (positionControlMode)
@@ -298,14 +350,12 @@ void loop()
 		target_angle = constrain(target_angle, -max_target_angle, max_target_angle); // limited output
 
 #ifdef DEBUG_SPEED
-		DB_PRINT("angle_adjusted:");
+		DB_PRINT(", angle_adjusted:");
 		DB_PRINT(angle_adjusted);
-		DB_PRINT(",");
-		DB_PRINT("estimated_speed_filtered:");
+		DB_PRINT(", estimated_speed_filtered:");
 		DB_PRINT(estimated_speed_filtered);
-		DB_PRINT(",");
-		DB_PRINT("target_angle:");
-		DB_PRINTLN(target_angle);
+		DB_PRINT(", target_angle:");
+		DB_PRINT(target_angle);
 #endif
 
 		// Stability control (100Hz loop): This is a PD controller.
@@ -382,7 +432,7 @@ void loop()
 			Kp_thr = KP_THROTTLE_RAISEUP;
 			Ki_thr = KI_THROTTLE_RAISEUP;
 		}
-
+		DB_PRINTLN("");
 	} // End of new IMU data
 
 	// Medium loop 7.5Hz
