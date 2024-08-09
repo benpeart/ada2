@@ -8,8 +8,7 @@
 #include "MPU6050.h"
 #include "Wire.h"
 #include "debug.h"
-
-#define DEBUG_IMU
+#include "defines.h"
 
 // BROBOT EVO 2 by JJROBOTS
 // SELF BALANCE ARDUINO ROBOT WITH STEPPER MOTORS

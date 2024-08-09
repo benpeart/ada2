@@ -55,7 +55,7 @@ extern float PID_errorOld2;
 extern float setPointOld;
 extern float target_angle;
 extern int16_t throttle;
-extern float steering;
+extern float steering;                    // positive == turn left, negative == turn right
 extern float max_throttle;
 extern float max_steering;
 extern float max_target_angle;

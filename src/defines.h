@@ -8,6 +8,11 @@
 #ifndef DEFINES_H_
 #define DEFINES_H_
 
+#define DEBUG_OSC
+//#define DEBUG_IMU
+//#define DEBUG_ESTIMATED_SPEED
+//#define DEBUG_SPEED
+
 #define PIN_ENABLE_MOTORS 19
 
 #define PIN_SERVO 23
@@ -69,7 +74,8 @@
 
 #define MICROSTEPPING 16   // 8 or 16 for 1/8 or 1/16 driver microstepping (default:16)
 
-#define DEBUG 1   // 0 = No debug info (default) DEBUG 1 for console output
+// now controlled in platform.ini based on build type (debug vs release)
+//#define DEBUG 1   // 0 = No debug info (default) DEBUG 1 for console output
 
 // AUX definitions
 #define CLR(x,y) (x&=(~(1<<y)))

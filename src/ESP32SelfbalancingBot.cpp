@@ -39,15 +39,10 @@
 // OSC controls:
 //    fader1: Throttle (0.0-1.0) OSC message: /1/fader1
 //    fader2: Steering (0.0-1.0) OSC message: /1/fader2
-//    push1: Move servo arm (and robot raiseup) OSC message /1/push1 
+//    push1: Move servo arm (and robot raiseup) OSC message /1/push1
 //    if you enable the touchMessage on TouchOSC options, controls return to center automatically when you lift your fingers
 //    PRO mode (PRO button). On PRO mode steering and throttle are more aggressive
 //    PAGE2: PID adjustements [optional][dont touch if you dont know what you are doing...;-) ]
-
-//#define DEBUG_OSC
-#define DEBUG_IMU
-//#define DEBUG_ESTIMATED_SPEED
-//#define DEBUG_SPEED
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -117,6 +112,7 @@ void setup()
 
 	OSC_init();
 
+	// move the motors back and forth to indicate life
 	digitalWrite(PIN_ENABLE_MOTORS, LOW);
 	for (uint8_t k = 0; k < 5; k++)
 	{
@@ -138,7 +134,7 @@ void processOSCMsg()
 {
 #ifdef DEBUG_OSC
 	DB_PRINTLN("processOSCMsg");
-#endif	
+#endif
 	if (OSCpage == 1)
 	{
 		if (modifing_control_parameters) // We came from the settings screen
@@ -163,7 +159,7 @@ void processOSCMsg()
 			DB_PRINT(",");
 			DB_PRINT("OSCmove_steps2:");
 			DB_PRINTLN(OSCmove_steps2);
-#endif			
+#endif
 			positionControlMode = true;
 			OSCmove_mode = false;
 			target_steps1 = steps1 + OSCmove_steps1;
@@ -184,7 +180,7 @@ void processOSCMsg()
 			DB_PRINT(throttle);
 			DB_PRINT(", OSC steering:");
 			DB_PRINT(steering);
-#endif			
+#endif
 		}
 
 		if ((mode == 0) && (OSCtoggle[0]))
@@ -309,7 +305,7 @@ void loop()
 
 		DB_PRINT(", angle_adjusted_filtered:");
 		DB_PRINT(angle_adjusted_filtered);
-#endif
+#endif // DEBUG_IMU
 		// We calculate the estimated robot speed:
 		// Estimated_Speed = angular_velocity_of_stepper_motors(combined) - angular_velocity_of_robot(angle measured by IMU)
 		actual_robot_speed = (speed_M1 + speed_M2) / 2; // Positive: forward
@@ -329,7 +325,7 @@ void loop()
 		DB_PRINT(angular_velocity);
 		DB_PRINT(", estimated_speed_filtered:");
 		DB_PRINT(estimated_speed_filtered);
-#endif
+#endif // DEBUG_ESTIMATED_SPEED
 
 		if (positionControlMode)
 		{
@@ -356,7 +352,7 @@ void loop()
 		DB_PRINT(estimated_speed_filtered);
 		DB_PRINT(", target_angle:");
 		DB_PRINT(target_angle);
-#endif
+#endif // DEBUG_SPEED
 
 		// Stability control (100Hz loop): This is a PD controller.
 		//    input: robot target angle(from SPEED CONTROL), variable: robot angle, output: Motor speed
@@ -365,8 +361,8 @@ void loop()
 		control_output = constrain(control_output, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT); // Limit max output from control
 
 		// The steering part from the user is injected directly to the output
-		motor1 = control_output + steering;
-		motor2 = control_output - steering;
+		motor1 = control_output - steering;
+		motor2 = control_output + steering;
 
 		// Limit max speed (control output)
 		motor1 = constrain(motor1, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT);
