@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include "defines.h"
 #include "globals.h"
+#include "Motors.h"
 
 // Set speed of Stepper Motor1
 // tspeed could be positive or negative (reverse)

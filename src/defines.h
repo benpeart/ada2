@@ -8,10 +8,12 @@
 #ifndef DEFINES_H_
 #define DEFINES_H_
 
-#define DEBUG_OSC
 //#define DEBUG_IMU
 //#define DEBUG_ESTIMATED_SPEED
 //#define DEBUG_SPEED
+//#define DEBUG_OSC
+#define DEBUG_XBOX_CONTROLLER
+#define XBOX_SERIAL_PLOTTER
 
 #define PIN_ENABLE_MOTORS 19
 

@@ -16,8 +16,6 @@ void OSC_MsgSend(char *c, unsigned char msgSize);
 void OSC_MsgSend(char *c, unsigned char msgSize, float p);
 
 void OSC_MsgRead();
-
-
-
+void OSC_MsgProcess();
 
 #endif /* OSC_H_ */
