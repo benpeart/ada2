@@ -10,7 +10,7 @@
 #include <XboxSeriesXControllerESP32_asukiaaa.hpp>
 
 // only bind to my xbox controller
-//XboxSeriesXControllerESP32_asukiaaa::Core xboxController("9c:aa:1b:f2:66:3d");
+// XboxSeriesXControllerESP32_asukiaaa::Core xboxController("9c:aa:1b:f2:66:3d");
 
 // bind to any xbox controller
 XboxSeriesXControllerESP32_asukiaaa::Core xboxController;
@@ -55,17 +55,26 @@ void Xbox_loop()
 
             // the steering is based off the left horizontal joystick
             // convert the range from 0 <-> maxJoy to -1.0 <-> 1.0
-             steering = (float)(xboxController.xboxNotif.joyLHori - (XboxControllerNotificationParser::maxJoy / 2)) / (XboxControllerNotificationParser::maxJoy / 2);
+            steering = (float)(xboxController.xboxNotif.joyLHori - (XboxControllerNotificationParser::maxJoy / 2)) / (XboxControllerNotificationParser::maxJoy / 2);
 
-			// We add some exponential on steering to smooth the center band
-			if (steering > 0)
-				steering = (steering * steering + 0.5 * steering) * max_steering;
-			else
-				steering = (-steering * steering + 0.5 * steering) * max_steering;
+            // We add some exponential on steering to smooth the center band
+            if (steering > 0)
+                steering = (steering * steering + 0.5 * steering) * max_steering;
+            else
+                steering = (-steering * steering + 0.5 * steering) * max_steering;
 
             // The 'Start' button will tell us to start the calibration process
             if (xboxController.xboxNotif.btnStart)
+            {
+#ifndef OLD_MPU6050
+                DB_PRINTLN("PID tuning - each dot = 100 readings");
+                mpu.CalibrateAccel(6);
+                mpu.CalibrateGyro(6);
+                DB_PRINTLN(" Calibration complete and stored in MPU6050");
+#else
                 MPU6050_calibrate();
+#endif // OLD_MPU6050
+            }
 
 #ifdef XBOX_SERIAL_PLOTTER
             DB_PRINT("throttle:");

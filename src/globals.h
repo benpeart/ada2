@@ -10,6 +10,13 @@
 
 #include <Arduino.h>
 #include "esp32-hal-timer.h"
+#ifndef OLD_MPU6050
+#include "MPU6050_6Axis_MotionApps20.h"
+
+extern MPU6050_6Axis_MotionApps20 mpu;
+extern uint16_t packetSize;			// expected DMP packet size (default is 42 bytes)
+extern volatile bool mpuInterrupt;  // indicates whether MPU interrupt pin has gone high
+#endif
 
 extern volatile long counter1;
 extern volatile long counter2;
@@ -30,7 +37,7 @@ extern float debugVariable;
 extern float dt;
 
 // Angle of the robot (used for stability control)
-extern float angle_adjusted;
+extern float angle_adjusted;            // +90 degrees leaning forward, -90 degrees leaning backward
 extern float angle_adjusted_Old;
 extern float angle_adjusted_filtered;
 

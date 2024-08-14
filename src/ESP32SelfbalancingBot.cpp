@@ -44,19 +44,23 @@
 //    PRO mode (PRO button). On PRO mode steering and throttle are more aggressive
 //    PAGE2: PID adjustements [optional][dont touch if you dont know what you are doing...;-) ]
 
+#include "defines.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <ArduinoOTA.h>
 #include <Wire.h>
+#ifdef OLD_MPU6050
 #include "MPU6050.h"
+#else
+#include "MPU6050_6Axis_MotionApps20.h"
+#endif
 #include <stdio.h>
 #include "esp_types.h"
 #include "soc/timer_group_struct.h"
 #include "driver/periph_ctrl.h"
 #include "driver/timer.h"
 #include "driver/ledc.h"
-#include "defines.h"
 #include "globals.h"
 #include "Motors.h"
 #include "Control.h"
@@ -78,11 +82,58 @@ void initWifiAP()
 	WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
 }
 
+#ifndef OLD_MPU6050
+void IRAM_ATTR dmpDataReady()
+{
+	mpuInterrupt = true;
+}
+#endif
+
 void initMPU6050()
 {
+#ifdef OLD_MPU6050
 	MPU6050_setup();
 	delay(500);
 	MPU6050_calibrate();
+#else
+	mpu.initialize();
+	if (!mpu.testConnection())
+	{
+		DB_PRINTLN("Failed to find MPU6050 chip");
+		while (1)
+			delay(10);
+	}
+	DB_PRINTLN("MPU6050 Found!");
+
+	// configure the MPU6050 Digital Motion Processor (DMP)
+	uint8_t devStatus; // return status after each device operation (0 = success, !0 = error)
+	devStatus = mpu.dmpInitialize();
+	if (devStatus == 0)
+	{
+		// turn on the DMP, now that it's ready
+		DB_PRINTLN("Enabling DMP...");
+		mpu.setDMPEnabled(true);
+
+		// enable interrupt detection
+		DB_PRINTF("Enabling interrupt detection (Arduino external interrupt %d)\n", MPU_INTERRUPT);
+		attachInterrupt(MPU_INTERRUPT, dmpDataReady, RISING);
+		DB_PRINTLN("DMP ready! Waiting for first interrupt...");
+
+		// get expected DMP packet size for later comparison
+		packetSize = mpu.dmpGetFIFOPacketSize();
+		DB_PRINTF("dmpGetFIFOPacketSize = %d\n", packetSize);
+	}
+	else
+	{
+		// ERROR!
+		// 1 = initial memory load failed
+		// 2 = DMP configuration updates failed
+		// (if it's going to break, usually the code will be 1)
+		DB_PRINTF("DMP Initialization failed (code %d)\n", devStatus);
+		while (1)
+			delay(10);
+	}
+#endif
 }
 
 void setup()
@@ -115,6 +166,7 @@ void setup()
 	OSC_init();
 
 	// move the motors back and forth to indicate life
+#ifdef OLD_MPU6050
 	digitalWrite(PIN_ENABLE_MOTORS, LOW);
 	for (uint8_t k = 0; k < 5; k++)
 	{
@@ -130,11 +182,13 @@ void setup()
 	ledcWrite(6, SERVO_AUX_NEUTRO);
 
 	digitalWrite(PIN_ENABLE_MOTORS, HIGH);
+#endif // OLD_MPU6050
 }
 
 void loop()
 {
 	OSC_MsgRead();
+
 	if (OSCnewMessage)
 	{
 		OSCnewMessage = 0;
@@ -145,15 +199,67 @@ void loop()
 
 	timer_value = micros();
 
+#ifdef OLD_MPU6050
 	if (MPU6050_newData())
 	{
 		MPU6050_read_3axis();
+#else
+	uint16_t fifoCount;		// count of all bytes currently in FIFO
+	uint8_t mpuIntStatus;	// holds actual interrupt status byte from MPU
+	uint8_t fifoBuffer[64]; // FIFO storage buffer
 
+	// orientation/motion vars
+	Quaternion q;					 // [w, x, y, z]         quaternion container
+	VectorFloat gravity;			 // [x, y, z]            gravity vector
+	static float ypr[3] = {0, 0, 0}; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+
+	// If we have new motion processor data, update ypr
+	fifoCount = mpu.getFIFOCount();
+	if (mpuInterrupt || fifoCount >= packetSize)
+	{
+		mpuInterrupt = false;
+		mpuIntStatus = mpu.getIntStatus();
+
+		if ((mpuIntStatus & 0x10) || fifoCount >= 1024)
+		{
+			mpu.resetFIFO();
+			DB_PRINTLN("FIFO overflow!");
+		}
+		else if (mpuIntStatus & 0x02)
+		{
+			// wait until we have a complete packet
+			while (fifoCount < packetSize)
+				fifoCount = mpu.getFIFOCount();
+
+			mpu.getFIFOBytes(fifoBuffer, packetSize);
+			fifoCount -= packetSize;
+
+			mpu.dmpGetQuaternion(&q, fifoBuffer);	   // get value for q
+			mpu.dmpGetGravity(&gravity, &q);		   // get value for gravity
+			mpu.dmpGetYawPitchRoll(ypr, &q, &gravity); // get value for ypr
+
+			angle_adjusted_Old = angle_adjusted;
+			// Get new orientation angle from IMU (MPU6050)
+			angle_adjusted = -ypr[1] * 180 / M_PI; // convert output to degrees and flip the sign
+
+#ifdef DEBUG_IMU
+			DB_PRINT("angle_adjusted:");
+			DB_PRINT(angle_adjusted);
+			DB_PRINT(", yaw:");
+			DB_PRINT(ypr[0] * 180 / M_PI);
+			DB_PRINT(", pitch:");
+			DB_PRINT(ypr[1] * 180 / M_PI);
+			DB_PRINT(", roll:");
+			DB_PRINT(ypr[2] * 180 / M_PI);
+#endif // DEBUG_IMU
+		}
+#endif
 		loop_counter++;
 		slow_loop_counter++;
 		dt = (timer_value - timer_old) * 0.000001; // dt in seconds
 		timer_old = timer_value;
 
+#ifdef OLD_MPU6050
 		angle_adjusted_Old = angle_adjusted;
 		// Get new orientation angle from IMU (MPU6050)
 		float MPU_sensor_angle = MPU6050_getAngle(dt);
@@ -168,14 +274,15 @@ void loop()
 		DB_PRINT(", angle_offset:");
 		DB_PRINT(angle_offset);
 
-		DB_PRINT(", angle_adjusted:");
-		DB_PRINT(angle_adjusted);
-
 		DB_PRINT(", angle_adjusted_filtered:");
 		DB_PRINT(angle_adjusted_filtered);
 #endif // DEBUG_IMU
-	   // We calculate the estimated robot speed:
-	   // Estimated_Speed = angular_velocity_of_stepper_motors(combined) - angular_velocity_of_robot(angle measured by IMU)
+		DB_PRINT(", angle_adjusted:");
+		DB_PRINT(angle_adjusted);
+#endif // OLD_MPU6050
+
+		// We calculate the estimated robot speed:
+		// Estimated_Speed = angular_velocity_of_stepper_motors(combined) - angular_velocity_of_robot(angle measured by IMU)
 		actual_robot_speed = (speed_M1 + speed_M2) / 2; // Positive: forward
 
 		int16_t angular_velocity = (angle_adjusted - angle_adjusted_Old) * 25.0; // 25 is an empirical extracted factor to adjust for real units
@@ -296,9 +403,9 @@ void loop()
 			Kp_thr = KP_THROTTLE_RAISEUP;
 			Ki_thr = KI_THROTTLE_RAISEUP;
 		}
-#ifdef DEBUG_IMU		
+#ifdef DEBUG_IMU
 		DB_PRINTLN("");
-#endif // DEBUG_IMU		
+#endif // DEBUG_IMU
 	} // End of new IMU data
 
 	// Medium loop 7.5Hz
