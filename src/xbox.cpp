@@ -54,14 +54,19 @@ void Xbox_loop()
             throttle = (car_speed_forward - car_speed_reverse) * max_throttle;
 
             // the steering is based off the left horizontal joystick
-            // convert the range from 0 <-> maxJoy to -1.0 <-> 1.0
-            steering = (float)(xboxController.xboxNotif.joyLHori - (XboxControllerNotificationParser::maxJoy / 2)) / (XboxControllerNotificationParser::maxJoy / 2);
+            // convert the range from 0 <-> maxJoy to -0.5 <-> 0.5
+            steering = (float)xboxController.xboxNotif.joyLHori / XboxControllerNotificationParser::maxJoy - 0.5;
 
             // We add some exponential on steering to smooth the center band
             if (steering > 0)
-                steering = (steering * steering + 0.5 * steering) * max_steering;
+                steering = (steering * steering + 0.5 * steering);
             else
-                steering = (-steering * steering + 0.5 * steering) * max_steering;
+                steering = (-steering * steering + 0.5 * steering);
+            steering = steering * max_steering;
+
+            // if within the dead zone, zero it out
+            if (steering > -STEERING_DEADZONE_RADIUS && steering < STEERING_DEADZONE_RADIUS)
+                steering = 0;
 
             // The 'Start' button will tell us to start the calibration process
             if (xboxController.xboxNotif.btnStart)
@@ -70,6 +75,9 @@ void Xbox_loop()
                 DB_PRINTLN("PID tuning - each dot = 100 readings");
                 mpu.CalibrateAccel(6);
                 mpu.CalibrateGyro(6);
+#ifdef DEBUG
+                mpu.PrintActiveOffsets();
+#endif
                 DB_PRINTLN(" Calibration complete and stored in MPU6050");
 #else
                 MPU6050_calibrate();
@@ -77,9 +85,9 @@ void Xbox_loop()
             }
 
 #ifdef XBOX_SERIAL_PLOTTER
-            DB_PRINT("throttle:");
-            DB_PRINT(throttle);
-            DB_PRINT(", steering:");
+            DB_PRINT(">throttle:");
+            DB_PRINTLN(throttle);
+            DB_PRINT(">steering:");
             DB_PRINTLN(steering);
 #endif // XBOX_SERIAL_PLOTTER
         }
