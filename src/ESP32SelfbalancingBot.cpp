@@ -48,7 +48,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
-#include <ArduinoOTA.h>
 #include <Wire.h>
 #ifdef OLD_MPU6050
 #include "MPU6050.h"
@@ -138,24 +137,39 @@ void initMPU6050()
 
 void setup()
 {
-	pinMode(PIN_ENABLE_MOTORS, OUTPUT);
-	digitalWrite(PIN_ENABLE_MOTORS, HIGH);
+	pinMode(PIN_MOTORS_ENABLE, OUTPUT);
+	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
 
-	pinMode(PIN_MOTOR1_DIR, OUTPUT);
+	// set micro stepping to 16
+#if MICROSTEPPING == 16
+	pinMode(PIN_MOTOR1_MS1, OUTPUT);
+	pinMode(PIN_MOTOR1_MS2, OUTPUT);
+	digitalWrite(PIN_MOTOR1_MS1, HIGH);
+	digitalWrite(PIN_MOTOR1_MS1, HIGH);
+	pinMode(PIN_MOTOR2_MS1, OUTPUT);
+	pinMode(PIN_MOTOR2_MS1, OUTPUT);
+	digitalWrite(PIN_MOTOR2_MS1, HIGH);
+	digitalWrite(PIN_MOTOR2_MS1, HIGH);
+#else
+#error Unsupported MICROSTEPPING value
+#endif
+
 	pinMode(PIN_MOTOR1_STEP, OUTPUT);
-	pinMode(PIN_MOTOR2_DIR, OUTPUT);
+	pinMode(PIN_MOTOR1_DIR, OUTPUT);
 	pinMode(PIN_MOTOR2_STEP, OUTPUT);
+	pinMode(PIN_MOTOR2_DIR, OUTPUT);
 
+#ifdef SERVO
 	pinMode(PIN_SERVO, OUTPUT);
-
 	ledcSetup(6, 50, 16);		 // channel 6, 50 Hz, 16-bit width
 	ledcAttachPin(PIN_SERVO, 6); // GPIO 22 assigned to channel 1
 	delay(50);
 	ledcWrite(6, SERVO_AUX_NEUTRO);
+#endif // SERVO
 
 	Serial.begin(115200);
 
-	Wire.begin();
+	Wire.begin(); // this has to happen _very_ early with the latest (6.5.0) platform
 
 	initWifiAP();
 
@@ -167,7 +181,7 @@ void setup()
 
 	// move the motors back and forth to indicate life
 #ifdef OLD_MPU6050
-	digitalWrite(PIN_ENABLE_MOTORS, LOW);
+	digitalWrite(PIN_MOTORS_ENABLE, LOW);
 	for (uint8_t k = 0; k < 5; k++)
 	{
 		setMotorSpeedM1(5);
@@ -181,7 +195,7 @@ void setup()
 	}
 	ledcWrite(6, SERVO_AUX_NEUTRO);
 
-	digitalWrite(PIN_ENABLE_MOTORS, HIGH);
+	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
 #endif // OLD_MPU6050
 }
 
@@ -243,14 +257,14 @@ void loop()
 			angle_adjusted = -ypr[1] * 180 / M_PI; // convert output to degrees and flip the sign
 
 #ifdef DEBUG_IMU
-			DB_PRINT("angle_adjusted:");
-			DB_PRINT(angle_adjusted);
-			DB_PRINT(", yaw:");
-			DB_PRINT(ypr[0] * 180 / M_PI);
-			DB_PRINT(", pitch:");
-			DB_PRINT(ypr[1] * 180 / M_PI);
-			DB_PRINT(", roll:");
-			DB_PRINT(ypr[2] * 180 / M_PI);
+			DB_PRINT(">angle_adjusted:");
+			DB_PRINTLN(angle_adjusted);
+			DB_PRINT(">yaw:");
+			DB_PRINTLN(ypr[0] * 180 / M_PI);
+			DB_PRINT(">pitch:");
+			DB_PRINTLN(ypr[1] * 180 / M_PI);
+			DB_PRINT(">roll:");
+			DB_PRINTLN(ypr[2] * 180 / M_PI);
 #endif // DEBUG_IMU
 		}
 #endif
@@ -351,14 +365,14 @@ void loop()
 		if ((angle_adjusted < angle_ready) && (angle_adjusted > -angle_ready)) // Is robot ready (upright?)
 		{
 			// NORMAL MODE
-			digitalWrite(PIN_ENABLE_MOTORS, LOW); // Motors enable
+			digitalWrite(PIN_MOTORS_ENABLE, LOW); // Motors enable
 			// NOW we send the commands to the motors
 			setMotorSpeedM1(motor1);
 			setMotorSpeedM2(motor2);
 		}
 		else // Robot not ready (flat), angle > angle_ready => ROBOT OFF
 		{
-			digitalWrite(PIN_ENABLE_MOTORS, HIGH); // Disable motors
+			digitalWrite(PIN_MOTORS_ENABLE, HIGH); // Disable motors
 			setMotorSpeedM1(0);
 			setMotorSpeedM2(0);
 			PID_errorSum = 0; // Reset PID I term
@@ -374,6 +388,8 @@ void loop()
 			throttle = 0;
 			steering = 0;
 		}
+
+#ifdef SERVO
 		// Push1 Move servo arm
 		if (OSCpush[0]) // Move arm
 		{
@@ -387,6 +403,7 @@ void loop()
 
 		// Servo2
 		// ledcWrite(6, SERVO2_NEUTRO + (OSCfader[2] - 0.5) * SERVO2_RANGE);
+#endif // SERVO
 
 		// Normal condition?
 		if ((angle_adjusted < 56) && (angle_adjusted > -56))

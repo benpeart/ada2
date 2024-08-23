@@ -42,13 +42,13 @@ void setMotorSpeedM1(int16_t tspeed)
   {
     timer_period = 2000000 / speed; // 2Mhz timer
     dir_M1 = 1;
-    digitalWrite(PIN_MOTOR1_DIR, HIGH);
+    digitalWrite(PIN_MOTOR1_DIR, LOW);
   }
   else
   {
     timer_period = 2000000 / -speed;
     dir_M1 = -1;
-    digitalWrite(PIN_MOTOR1_DIR, LOW);
+    digitalWrite(PIN_MOTOR1_DIR, HIGH);
   }
   if (timer_period > ZERO_SPEED)   // Check for minimun speed (maximun period without overflow)
     timer_period = ZERO_SPEED;

@@ -261,7 +261,7 @@ void OSC_MsgProcess()
 			timer_old = millis();
 			setMotorSpeedM1(0);
 			setMotorSpeedM2(0);
-			digitalWrite(PIN_ENABLE_MOTORS, HIGH); // Disable motors
+			digitalWrite(PIN_MOTORS_ENABLE, HIGH); // Disable motors
 			OSC_MsgRead();
 		}
 	}
