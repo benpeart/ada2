@@ -46,31 +46,29 @@
 
 #include "defines.h"
 #include <Arduino.h>
+#ifdef JJROBOTS_APP
 #include <WiFi.h>
 #include <WiFiClient.h>
+#endif // JJROBOTS_APP
 #include <Wire.h>
 #ifdef OLD_MPU6050
 #include "MPU6050.h"
 #else
 #include "MPU6050_6Axis_MotionApps20.h"
-#endif
-#include <stdio.h>
-#include "esp_types.h"
-#include "soc/timer_group_struct.h"
-#include "driver/periph_ctrl.h"
-#include "driver/timer.h"
-#include "driver/ledc.h"
+#endif // OLD_MPU6050
 #include "globals.h"
 #include "Motors.h"
 #include "Control.h"
+#ifdef JJROBOTS_APP
 #include <WiFiUdp.h>
 #include "OSC.h"
-#include "esp32-hal-ledc.h"
+#endif // JJROBOTS_APP
 #include "debug.h"
 #include "xbox.h"
 
 void initTimers();
 
+#ifdef JJROBOTS_APP
 void initWifiAP()
 {
 	DB_PRINTLN("Setting up WiFi AP...");
@@ -80,6 +78,7 @@ void initWifiAP()
 	}
 	WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
 }
+#endif // JJROBOTS_APP
 
 #ifndef OLD_MPU6050
 void IRAM_ATTR dmpDataReady()
@@ -137,10 +136,11 @@ void initMPU6050()
 
 void setup()
 {
+	// setup the stepper motor
 	pinMode(PIN_MOTORS_ENABLE, OUTPUT);
 	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
 
-	// set micro stepping to 16
+	// set micro stepping
 #if MICROSTEPPING == 16
 	pinMode(PIN_MOTOR1_MS1, OUTPUT);
 	pinMode(PIN_MOTOR1_MS2, OUTPUT);
@@ -170,14 +170,15 @@ void setup()
 	Serial.begin(115200);
 
 	Wire.begin(); // this has to happen _very_ early with the latest (6.5.0) platform
-
-	initWifiAP();
-
 	initMPU6050();
 	initTimers();
 
-	Xbox_setup();
+#ifdef JJROBOTS_APP
+	initWifiAP();
 	OSC_init();
+#endif // JJROBOTS_APP
+
+	Xbox_setup();
 
 	// move the motors back and forth to indicate life
 #ifdef OLD_MPU6050
@@ -201,6 +202,7 @@ void setup()
 
 void loop()
 {
+#ifdef JJROBOTS_APP
 	OSC_MsgRead();
 
 	if (OSCnewMessage)
@@ -208,6 +210,7 @@ void loop()
 		OSCnewMessage = 0;
 		OSC_MsgProcess();
 	}
+#endif // JJROBOTS_APP
 
 	Xbox_loop();
 
@@ -357,11 +360,12 @@ void loop()
 		motor1 = constrain(motor1, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT);
 		motor2 = constrain(motor2, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT);
 
-		int angle_ready;
+		int angle_ready = 74;
+#ifdef JJROBOTS_APP
 		if (OSCpush[0]) // If we press the SERVO button we start to move
 			angle_ready = 82;
-		else
-			angle_ready = 74;												   // Default angle
+#endif // JJROBOTS_APP
+
 		if ((angle_adjusted < angle_ready) && (angle_adjusted > -angle_ready)) // Is robot ready (upright?)
 		{
 			// NORMAL MODE
@@ -384,7 +388,9 @@ void loop()
 			steps1 = 0;
 			steps2 = 0;
 			positionControlMode = false;
+#ifdef JJROBOTS_APP
 			OSCmove_mode = false;
+#endif // JJROBOTS_APP
 			throttle = 0;
 			steering = 0;
 		}
@@ -401,8 +407,8 @@ void loop()
 		else
 			ledcWrite(6, SERVO_AUX_NEUTRO);
 
-		// Servo2
-		// ledcWrite(6, SERVO2_NEUTRO + (OSCfader[2] - 0.5) * SERVO2_RANGE);
+			// Servo2
+			// ledcWrite(6, SERVO2_NEUTRO + (OSCfader[2] - 0.5) * SERVO2_RANGE);
 #endif // SERVO
 
 		// Normal condition?
@@ -430,6 +436,7 @@ void loop()
 	{
 		loop_counter = 0;
 		// Telemetry here?
+#ifdef JJROBOTS_APP		
 #if TELEMETRY_ANGLE == 1
 		char auxS[25];
 		int ang_out = constrain(int(angle_adjusted * 10), -900, 900);
@@ -441,6 +448,7 @@ void loop()
 		sprintf(auxS, "$tD,%d,%d,%ld", int(angle_adjusted * 10), int(estimated_speed_filtered), steps1);
 		OSC_MsgSend(auxS, 50);
 #endif
+#endif // JJROBOTS_APP
 	} // End of medium loop
 	else if (slow_loop_counter >= 100) // 1Hz
 	{

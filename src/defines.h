@@ -8,8 +8,12 @@
 #ifndef DEFINES_H_
 #define DEFINES_H_
 
+// turn off unwanted features
 // #define OLD_MPU6050
 // #define SERVO
+// #define JJROBOTS_APP
+
+// debugging support
 // #define DEBUG_IMU
 // #define DEBUG_ESTIMATED_SPEED
 // #define DEBUG_SPEED

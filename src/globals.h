@@ -23,8 +23,6 @@ extern volatile long counter2;
 extern hw_timer_t * timer1;
 extern hw_timer_t * timer2;
 
-extern String MAC;  // MAC address of Wifi module
-
 extern uint8_t cascade_control_loop_counter;
 extern uint8_t loop_counter;       // To generate a medium loop 40Hz
 extern uint8_t slow_loop_counter;  // slow loop 2Hz
@@ -89,6 +87,7 @@ extern int16_t actual_robot_speed;        // overall robot speed (measured from 
 extern int16_t actual_robot_speed_Old;
 extern float estimated_speed_filtered;    // Estimated robot speed
 
+#ifdef JJROBOTS_APP
 // OSC output variables
 extern uint8_t OSCpage;
 extern uint8_t OSCnewMessage;
@@ -103,5 +102,6 @@ extern uint8_t OSCmove_mode;
 extern int16_t OSCmove_speed;
 extern int16_t OSCmove_steps1;
 extern int16_t OSCmove_steps2;
+#endif // JJROBOTS_APP
 
 #endif /* GLOBALS_H_ */

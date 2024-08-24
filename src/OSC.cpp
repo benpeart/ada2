@@ -5,13 +5,14 @@
  *      Author: anonymous
  */
 
+#include "defines.h"
 #include "OSC.h"
 #include <WiFiUdp.h>
 #include "debug.h"
 #include "globals.h"
-#include "defines.h"
 #include "Motors.h"
 
+#ifdef JJROBOTS_APP
 // for DEBUG uncomment this lines...
 //#define OSCDEBUG 0
 
@@ -266,3 +267,4 @@ void OSC_MsgProcess()
 		}
 	}
 }
+#endif // JJROBOTS_APP

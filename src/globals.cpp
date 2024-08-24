@@ -11,8 +11,6 @@
 #include "esp32-hal-timer.h"
 
 
-String MAC;  // MAC address of Wifi module
-
 volatile long counter1 = 0;
 volatile long counter2 = 0;
 hw_timer_t * timer1 = NULL;
@@ -88,6 +86,7 @@ int16_t actual_robot_speed;        // overall robot speed (measured from stepper
 int16_t actual_robot_speed_Old;
 float estimated_speed_filtered;    // Estimated robot speed
 
+#ifdef JJROBOTS_APP
 // OSC output variables
 uint8_t OSCpage;
 uint8_t OSCnewMessage;
@@ -102,5 +101,4 @@ uint8_t OSCmove_mode;
 int16_t OSCmove_speed;
 int16_t OSCmove_steps1;
 int16_t OSCmove_steps2;
-
-
+#endif // JJROBOTS_APP
