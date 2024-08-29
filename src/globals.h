@@ -10,29 +10,8 @@
 
 #include <Arduino.h>
 #include "esp32-hal-timer.h"
-#ifndef OLD_MPU6050
-#include "MPU6050_6Axis_MotionApps20.h"
-
-extern MPU6050_6Axis_MotionApps20 mpu;
-extern uint16_t packetSize;			// expected DMP packet size (default is 42 bytes)
-extern volatile bool mpuInterrupt;  // indicates whether MPU interrupt pin has gone high
-#endif
-
-extern volatile long counter1;
-extern volatile long counter2;
-extern hw_timer_t * timer1;
-extern hw_timer_t * timer2;
-
-extern uint8_t cascade_control_loop_counter;
-extern uint8_t loop_counter;       // To generate a medium loop 40Hz
-extern uint8_t slow_loop_counter;  // slow loop 2Hz
-extern uint8_t sendBattery_counter; // To send battery status
-extern int16_t BatteryValue;
 
 extern long timer_old;
-extern long timer_value;
-extern float debugVariable;
-extern float dt;
 
 // Angle of the robot (used for stability control)
 extern float angle_adjusted;            // +90 degrees leaning forward, -90 degrees leaning backward
@@ -50,15 +29,10 @@ extern float Kp_thr_user;
 extern float Ki_thr_user;
 extern float Kp_position;
 extern float Kd_position;
-extern bool newControlParameters;
-extern bool modifing_control_parameters;
-extern int16_t position_error_sum_M1;
-extern int16_t position_error_sum_M2;
 extern float PID_errorSum;
 extern float PID_errorOld;
 extern float PID_errorOld2;
 extern float setPointOld;
-extern float target_angle;
 extern int16_t throttle;
 extern float steering;                    // positive == turn left, negative == turn right
 extern float max_throttle;
@@ -70,9 +44,6 @@ extern float angle_offset;
 extern boolean positionControlMode;
 extern uint8_t mode;  // mode = 0 Normal mode, mode = 1 Pro mode (More agressive)
 
-extern int16_t motor1;
-extern int16_t motor2;
-
 // position control
 extern volatile int32_t steps1;
 extern volatile int32_t steps2;
@@ -83,9 +54,6 @@ extern int16_t motor2_control;
 
 extern int16_t speed_M1, speed_M2;        // Actual speed of motors
 extern int8_t  dir_M1, dir_M2;            // Actual direction of steppers motors
-extern int16_t actual_robot_speed;        // overall robot speed (measured from steppers speed)
-extern int16_t actual_robot_speed_Old;
-extern float estimated_speed_filtered;    // Estimated robot speed
 
 #ifdef JJROBOTS_APP
 // OSC output variables

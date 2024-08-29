@@ -6,10 +6,24 @@
  */
 
 #include <Arduino.h>
+#include "defines.h"
 
 #ifndef MPU6050_H_
 #define MPU6050_H_
 
+#ifndef OLD_MPU6050
+#include "MPU6050_6Axis_MotionApps20.h"
+
+// 0 = success
+// 1 = initial memory load failed
+// 2 = DMP configuration updates failed
+// (if it's going to break, usually the code will be 1)
+uint8_t MPU6050_setup();
+void MPU6050_calibrate();
+bool MPU6050_newData();
+float MPU6050_getAngle();
+
+#else
 #define RAD2GRAD 57.2957795
 #define GRAD2RAD 0.01745329251994329576923690768489
 
@@ -471,5 +485,6 @@ bool MPU6050_newData();
 int MPU6050_read(int start, uint8_t *buffer, int size);
 int MPU6050_write(int start, const uint8_t *pData, int size);
 int MPU6050_write_reg(int reg, uint8_t data);
+#endif // OLD_MPU6050
 
 #endif /* MPU6050_H_ */

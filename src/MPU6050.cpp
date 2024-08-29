@@ -9,6 +9,135 @@
 #include "Wire.h"
 #include "debug.h"
 #include "defines.h"
+#include "globals.h"
+
+#ifndef OLD_MPU6050
+
+MPU6050_6Axis_MotionApps20 mpu;
+uint16_t packetSize;                // expected DMP packet size (default is 42 bytes)
+volatile bool mpuInterrupt = false; // indicates whether MPU interrupt pin has gone high
+
+void IRAM_ATTR dmpDataReady()
+{
+  mpuInterrupt = true;
+}
+
+uint8_t MPU6050_setup()
+{
+  Wire.begin(); // this has to happen _very_ early with the latest (6.5.0) platform
+
+  mpu.initialize();
+  if (!mpu.testConnection())
+  {
+    DB_PRINTLN("Failed to find MPU6050 chip");
+    while (1)
+      delay(10);
+  }
+  DB_PRINTLN("MPU6050 Found!");
+
+  // configure the MPU6050 Digital Motion Processor (DMP)
+  uint8_t devStatus; // return status after each device operation (0 = success, !0 = error)
+  devStatus = mpu.dmpInitialize();
+  if (devStatus == 0)
+  {
+    // turn on the DMP, now that it's ready
+    DB_PRINTLN("Enabling DMP...");
+    mpu.setDMPEnabled(true);
+
+    // enable interrupt detection
+    DB_PRINTF("Enabling interrupt detection (Arduino external interrupt %d)\n", MPU_INTERRUPT);
+    attachInterrupt(MPU_INTERRUPT, dmpDataReady, RISING);
+    DB_PRINTLN("DMP ready! Waiting for first interrupt...");
+
+    // get expected DMP packet size for later comparison
+    packetSize = mpu.dmpGetFIFOPacketSize();
+    DB_PRINTF("dmpGetFIFOPacketSize = %d\n", packetSize);
+  }
+  else
+  {
+    // ERROR!
+    // 1 = initial memory load failed
+    // 2 = DMP configuration updates failed
+    // (if it's going to break, usually the code will be 1)
+    DB_PRINTF("DMP Initialization failed (code %d)\n", devStatus);
+  }
+
+  return devStatus;
+}
+
+void MPU6050_calibrate()
+{
+  DB_PRINTLN("PID tuning - each dot = 100 readings");
+  mpu.CalibrateAccel(6);
+  mpu.CalibrateGyro(6);
+#ifdef DEBUG
+  mpu.PrintActiveOffsets();
+#endif
+  DB_PRINTLN(" Calibration complete and stored in MPU6050");
+}
+
+float MPU6050_getAngle()
+{
+  uint16_t fifoCount;     // count of all bytes currently in FIFO
+  uint8_t fifoBuffer[64]; // FIFO storage buffer
+  float angle_adjusted;
+
+  // orientation/motion vars
+  Quaternion q;                    // [w, x, y, z]         quaternion container
+  VectorFloat gravity;             // [x, y, z]            gravity vector
+  static float ypr[3] = {0, 0, 0}; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+
+  // wait until we have a complete packet
+  while (fifoCount < packetSize)
+    fifoCount = mpu.getFIFOCount();
+
+  mpu.getFIFOBytes(fifoBuffer, packetSize);
+  mpu.dmpGetQuaternion(&q, fifoBuffer);      // get value for q
+  mpu.dmpGetGravity(&gravity, &q);           // get value for gravity
+  mpu.dmpGetYawPitchRoll(ypr, &q, &gravity); // get value for ypr
+
+  // Get new orientation angle from IMU (MPU6050)
+  angle_adjusted = -ypr[1] * 180 / M_PI; // convert output to degrees and flip the sign
+
+#ifdef DEBUG_IMU
+  DB_PRINT(">yaw:");
+  DB_PRINTLN(ypr[0] * 180 / M_PI);
+  DB_PRINT(">pitch:");
+  DB_PRINTLN(ypr[1] * 180 / M_PI);
+  DB_PRINT(">roll:");
+  DB_PRINTLN(ypr[2] * 180 / M_PI);
+  DB_PRINT(">angle_adjusted:");
+  DB_PRINTLN(angle_adjusted);
+#endif // DEBUG_IMU
+
+  return angle_adjusted;
+}
+
+bool MPU6050_newData()
+{
+  uint16_t fifoCount;   // count of all bytes currently in FIFO
+  uint8_t mpuIntStatus; // holds actual interrupt status byte from MPU
+
+  // If we have new motion processor data, update ypr
+  fifoCount = mpu.getFIFOCount();
+  if (mpuInterrupt || fifoCount >= packetSize)
+  {
+    mpuInterrupt = false;
+    mpuIntStatus = mpu.getIntStatus();
+
+    if ((mpuIntStatus & 0x10) || fifoCount >= 1024)
+    {
+      mpu.resetFIFO();
+      DB_PRINTLN("FIFO overflow!");
+    }
+    else if (mpuIntStatus & 0x02)
+      return true;
+  }
+
+  return false;
+}
+
+#else
 
 // BROBOT EVO 2 by JJROBOTS
 // SELF BALANCE ARDUINO ROBOT WITH STEPPER MOTORS
@@ -53,17 +182,14 @@ float MPU6050_getAngle(float dt)
   y_gyro_offset = y_gyro_offset * 0.9995 + correction * 0.0005;                                      // Time constant of this correction is around 20 sec.
 
 #ifdef DEBUG_IMU
-  DB_PRINT("accel_angle:");
-  DB_PRINT(accel_angle);
-
-  DB_PRINT(", y_gyro_value:");
-  DB_PRINT(y_gyro_value);
-
-  DB_PRINT(", angle:");
-  DB_PRINT(angle);
-
-  DB_PRINT(", y_gyro_offset:");
-  DB_PRINT(y_gyro_offset);
+  DB_PRINT(">accel_angle:");
+  DB_PRINTLN(accel_angle);
+  DB_PRINT(">y_gyro_value:");
+  DB_PRINTLN(y_gyro_value);
+  DB_PRINT(">y_gyro_offset:");
+  DB_PRINTLN(y_gyro_offset);
+  DB_PRINT(">angle:");
+  DB_PRINTLN(angle);
 #endif
 
   return angle;
@@ -121,6 +247,7 @@ void MPU6050_calibrate()
 
 void MPU6050_setup()
 {
+  Wire.begin(); // this has to happen _very_ early with the latest (6.5.0) platform
 #ifdef DEBUG_MPU
   int error;
   uint8_t c;
@@ -311,3 +438,4 @@ int MPU6050_write_reg(int reg, uint8_t data)
 
   return (error);
 }
+#endif // OLD_MPU6050

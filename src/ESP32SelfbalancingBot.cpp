@@ -49,24 +49,16 @@
 #ifdef JJROBOTS_APP
 #include <WiFi.h>
 #include <WiFiClient.h>
-#endif // JJROBOTS_APP
-#include <Wire.h>
-#ifdef OLD_MPU6050
-#include "MPU6050.h"
-#else
-#include "MPU6050_6Axis_MotionApps20.h"
-#endif // OLD_MPU6050
-#include "globals.h"
-#include "Motors.h"
-#include "Control.h"
-#ifdef JJROBOTS_APP
 #include <WiFiUdp.h>
 #include "OSC.h"
 #endif // JJROBOTS_APP
+#include <Wire.h>
+#include "MPU6050.h"
+#include "globals.h"
+#include "Motors.h"
+#include "Control.h"
 #include "debug.h"
 #include "xbox.h"
-
-void initTimers();
 
 #ifdef JJROBOTS_APP
 void initWifiAP()
@@ -80,84 +72,17 @@ void initWifiAP()
 }
 #endif // JJROBOTS_APP
 
-#ifndef OLD_MPU6050
-void IRAM_ATTR dmpDataReady()
-{
-	mpuInterrupt = true;
-}
-#endif
-
-void initMPU6050()
-{
-#ifdef OLD_MPU6050
-	MPU6050_setup();
-	delay(500);
-	MPU6050_calibrate();
-#else
-	mpu.initialize();
-	if (!mpu.testConnection())
-	{
-		DB_PRINTLN("Failed to find MPU6050 chip");
-		while (1)
-			delay(10);
-	}
-	DB_PRINTLN("MPU6050 Found!");
-
-	// configure the MPU6050 Digital Motion Processor (DMP)
-	uint8_t devStatus; // return status after each device operation (0 = success, !0 = error)
-	devStatus = mpu.dmpInitialize();
-	if (devStatus == 0)
-	{
-		// turn on the DMP, now that it's ready
-		DB_PRINTLN("Enabling DMP...");
-		mpu.setDMPEnabled(true);
-
-		// enable interrupt detection
-		DB_PRINTF("Enabling interrupt detection (Arduino external interrupt %d)\n", MPU_INTERRUPT);
-		attachInterrupt(MPU_INTERRUPT, dmpDataReady, RISING);
-		DB_PRINTLN("DMP ready! Waiting for first interrupt...");
-
-		// get expected DMP packet size for later comparison
-		packetSize = mpu.dmpGetFIFOPacketSize();
-		DB_PRINTF("dmpGetFIFOPacketSize = %d\n", packetSize);
-	}
-	else
-	{
-		// ERROR!
-		// 1 = initial memory load failed
-		// 2 = DMP configuration updates failed
-		// (if it's going to break, usually the code will be 1)
-		DB_PRINTF("DMP Initialization failed (code %d)\n", devStatus);
-		while (1)
-			delay(10);
-	}
-#endif
-}
-
 void setup()
 {
-	// setup the stepper motor
-	pinMode(PIN_MOTORS_ENABLE, OUTPUT);
-	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
+	Serial.begin(230400);
 
-	// set micro stepping
-#if MICROSTEPPING == 16
-	pinMode(PIN_MOTOR1_MS1, OUTPUT);
-	pinMode(PIN_MOTOR1_MS2, OUTPUT);
-	digitalWrite(PIN_MOTOR1_MS1, HIGH);
-	digitalWrite(PIN_MOTOR1_MS1, HIGH);
-	pinMode(PIN_MOTOR2_MS1, OUTPUT);
-	pinMode(PIN_MOTOR2_MS1, OUTPUT);
-	digitalWrite(PIN_MOTOR2_MS1, HIGH);
-	digitalWrite(PIN_MOTOR2_MS1, HIGH);
-#else
-#error Unsupported MICROSTEPPING value
-#endif
+	MPU6050_setup(); // this has to happen _very_ early with the latest (6.5.0) platform
+#ifdef OLD_MPU6050
+	delay(500);
+	MPU6050_calibrate();
+#endif // OLD_MPU6050
 
-	pinMode(PIN_MOTOR1_STEP, OUTPUT);
-	pinMode(PIN_MOTOR1_DIR, OUTPUT);
-	pinMode(PIN_MOTOR2_STEP, OUTPUT);
-	pinMode(PIN_MOTOR2_DIR, OUTPUT);
+	Motors_setup();
 
 #ifdef SERVO
 	pinMode(PIN_SERVO, OUTPUT);
@@ -166,42 +91,20 @@ void setup()
 	delay(50);
 	ledcWrite(6, SERVO_AUX_NEUTRO);
 #endif // SERVO
-
-	Serial.begin(115200);
-
-	Wire.begin(); // this has to happen _very_ early with the latest (6.5.0) platform
-	initMPU6050();
-	initTimers();
-
 #ifdef JJROBOTS_APP
 	initWifiAP();
 	OSC_init();
 #endif // JJROBOTS_APP
 
 	Xbox_setup();
-
-	// move the motors back and forth to indicate life
-#ifdef OLD_MPU6050
-	digitalWrite(PIN_MOTORS_ENABLE, LOW);
-	for (uint8_t k = 0; k < 5; k++)
-	{
-		setMotorSpeedM1(5);
-		setMotorSpeedM2(5);
-		ledcWrite(6, SERVO_AUX_NEUTRO + 250);
-		delay(200);
-		setMotorSpeedM1(-5);
-		setMotorSpeedM2(-5);
-		ledcWrite(6, SERVO_AUX_NEUTRO - 250);
-		delay(200);
-	}
-	ledcWrite(6, SERVO_AUX_NEUTRO);
-
-	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
-#endif // OLD_MPU6050
 }
 
 void loop()
 {
+	static uint8_t loop_counter;	  // To generate a medium loop 40Hz
+	static uint8_t slow_loop_counter; // slow loop 2Hz
+	static long timer_value;
+
 #ifdef JJROBOTS_APP
 	OSC_MsgRead();
 
@@ -216,67 +119,30 @@ void loop()
 
 	timer_value = micros();
 
-#ifdef OLD_MPU6050
 	if (MPU6050_newData())
 	{
-		MPU6050_read_3axis();
-#else
-	uint16_t fifoCount;		// count of all bytes currently in FIFO
-	uint8_t mpuIntStatus;	// holds actual interrupt status byte from MPU
-	uint8_t fifoBuffer[64]; // FIFO storage buffer
+		float dt;
+		float target_angle;
+		int16_t motor1;
+		int16_t motor2;
+		int16_t actual_robot_speed;		// overall robot speed (measured from steppers speed)
+		float estimated_speed_filtered; // Estimated robot speed
 
-	// orientation/motion vars
-	Quaternion q;					 // [w, x, y, z]         quaternion container
-	VectorFloat gravity;			 // [x, y, z]            gravity vector
-	static float ypr[3] = {0, 0, 0}; // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-
-	// If we have new motion processor data, update ypr
-	fifoCount = mpu.getFIFOCount();
-	if (mpuInterrupt || fifoCount >= packetSize)
-	{
-		mpuInterrupt = false;
-		mpuIntStatus = mpu.getIntStatus();
-
-		if ((mpuIntStatus & 0x10) || fifoCount >= 1024)
-		{
-			mpu.resetFIFO();
-			DB_PRINTLN("FIFO overflow!");
-		}
-		else if (mpuIntStatus & 0x02)
-		{
-			// wait until we have a complete packet
-			while (fifoCount < packetSize)
-				fifoCount = mpu.getFIFOCount();
-
-			mpu.getFIFOBytes(fifoBuffer, packetSize);
-			fifoCount -= packetSize;
-
-			mpu.dmpGetQuaternion(&q, fifoBuffer);	   // get value for q
-			mpu.dmpGetGravity(&gravity, &q);		   // get value for gravity
-			mpu.dmpGetYawPitchRoll(ypr, &q, &gravity); // get value for ypr
-
-			angle_adjusted_Old = angle_adjusted;
-			// Get new orientation angle from IMU (MPU6050)
-			angle_adjusted = -ypr[1] * 180 / M_PI; // convert output to degrees and flip the sign
-
-#ifdef DEBUG_IMU
-			DB_PRINT(">angle_adjusted:");
-			DB_PRINTLN(angle_adjusted);
-			DB_PRINT(">yaw:");
-			DB_PRINTLN(ypr[0] * 180 / M_PI);
-			DB_PRINT(">pitch:");
-			DB_PRINTLN(ypr[1] * 180 / M_PI);
-			DB_PRINT(">roll:");
-			DB_PRINTLN(ypr[2] * 180 / M_PI);
-#endif // DEBUG_IMU
-		}
-#endif
 		loop_counter++;
 		slow_loop_counter++;
 		dt = (timer_value - timer_old) * 0.000001; // dt in seconds
 		timer_old = timer_value;
 
-#ifdef OLD_MPU6050
+#ifdef OUTPUT_DT
+		DB_PRINT(">dt (Hz):");
+		DB_PRINTLN(dt * 10000);
+#endif // OUTPUT_DT
+
+#ifndef OLD_MPU6050
+		angle_adjusted_Old = angle_adjusted; // used to compute angular velocity
+		angle_adjusted = MPU6050_getAngle();
+#else
+		MPU6050_read_3axis();
 		angle_adjusted_Old = angle_adjusted;
 		// Get new orientation angle from IMU (MPU6050)
 		float MPU_sensor_angle = MPU6050_getAngle(dt);
@@ -285,17 +151,11 @@ void loop()
 			angle_adjusted_filtered = angle_adjusted_filtered * 0.99 + MPU_sensor_angle * 0.01;
 
 #ifdef DEBUG_IMU
-		DB_PRINT(", MPU_sensor_angle:");
-		DB_PRINT(MPU_sensor_angle);
-
-		DB_PRINT(", angle_offset:");
-		DB_PRINT(angle_offset);
-
-		DB_PRINT(", angle_adjusted_filtered:");
-		DB_PRINT(angle_adjusted_filtered);
+		DB_PRINT(">MPU_sensor_angle:");
+		DB_PRINTLN(MPU_sensor_angle);
+		DB_PRINT(">angle_adjusted:");
+		DB_PRINTLN(angle_adjusted);
 #endif // DEBUG_IMU
-		DB_PRINT(", angle_adjusted:");
-		DB_PRINT(angle_adjusted);
 #endif // OLD_MPU6050
 
 		// We calculate the estimated robot speed:
@@ -353,8 +213,8 @@ void loop()
 		control_output = constrain(control_output, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT); // Limit max output from control
 
 		// The steering part from the user is injected directly to the output
-		motor1 = control_output - steering;
-		motor2 = control_output + steering;
+		motor1 = control_output + steering;
+		motor2 = control_output - steering;
 
 		// Limit max speed (control output)
 		motor1 = constrain(motor1, -MAX_CONTROL_OUTPUT, MAX_CONTROL_OUTPUT);
@@ -436,7 +296,7 @@ void loop()
 	{
 		loop_counter = 0;
 		// Telemetry here?
-#ifdef JJROBOTS_APP		
+#ifdef JJROBOTS_APP
 #if TELEMETRY_ANGLE == 1
 		char auxS[25];
 		int ang_out = constrain(int(angle_adjusted * 10), -900, 900);
@@ -455,17 +315,24 @@ void loop()
 		slow_loop_counter = 0;
 		// Read  status
 #if TELEMETRY_BATTERY == 1
-		BatteryValue = (BatteryValue + BROBOT_readBattery(false)) / 2;
-		sendBattery_counter++;
-		if (sendBattery_counter >= 3)
-		{ // Every 3 seconds we send a message
-			sendBattery_counter = 0;
-			DB_PRINT("BatteryValue:");
-			DB_PRINTLN(BatteryValue);
-			char auxS[25];
-			sprintf(auxS, "$tB,%04d", BatteryValue);
-			OSC_MsgSend(auxS, 25);
-		}
-#endif
+		const float R1 = 100000.0;		  // 100kΩ
+		const float R2 = 10000.0;		  // 10kΩ
+		const float ADC_MAX = 4095.0;	  // 12-bit ADC
+		const float V_REF = 3.3;		  // Reference voltage
+		const float ALPHA = 0.05;		  // low pass filter
+		static float filteredBattery = 0; // use a low-pass filter to smooth battery readings
+
+		int adcValue = analogRead(PIN_BATTERY_VOLTAGE);
+		float voltage = (adcValue / ADC_MAX) * V_REF;
+		float batteryVoltage = voltage * (R1 + R2) / R2;
+
+		// take the first and filter the rest
+		if (!filteredBattery)
+			filteredBattery = batteryVoltage;
+		else
+			filteredBattery = (ALPHA * batteryVoltage) + ((1 - ALPHA) * filteredBattery);
+		DB_PRINT(">Battery Voltage:");
+		DB_PRINTLN(filteredBattery);
+#endif // TELEMETRY_BATTERY
 	} // End of slow loop
 }

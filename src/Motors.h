@@ -10,10 +10,8 @@
 
 #include <Arduino.h>
 
+void Motors_setup();
 void setMotorSpeedM1(int16_t tspeed);
 void setMotorSpeedM2(int16_t tspeed);
-
-
-
 
 #endif /* MOTORS_H_ */

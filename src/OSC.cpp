@@ -16,6 +16,8 @@
 // for DEBUG uncomment this lines...
 //#define OSCDEBUG 0
 
+bool modifing_control_parameters = false;
+
 #define MAX_BUFFER 32
 unsigned char UDPBuffer[MAX_BUFFER]; // input message buffer
 
@@ -250,6 +252,7 @@ void OSC_MsgProcess()
 		{
 			DB_PRINT("OSC Calibration MODE ");
 			angle_offset = angle_adjusted_filtered;
+			DB_PRINT(">angle_offset:");
 			DB_PRINTLN(angle_offset);
 		}
 

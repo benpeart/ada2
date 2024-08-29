@@ -10,6 +10,95 @@
 #include "globals.h"
 #include "Motors.h"
 
+hw_timer_t * timer1 = NULL;
+hw_timer_t * timer2 = NULL;
+
+extern "C"
+{
+
+	portMUX_TYPE muxer1 = portMUX_INITIALIZER_UNLOCKED;
+	portMUX_TYPE muxer2 = portMUX_INITIALIZER_UNLOCKED;
+
+	void IRAM_ATTR timer1ISR()
+	{
+		portENTER_CRITICAL_ISR(&muxer1);
+
+		if (dir_M1 != 0)
+		{
+			// We generate 1us STEP pulse
+			digitalWrite(PIN_MOTOR1_STEP, HIGH);
+			delayMicroseconds(1);
+
+			if (dir_M1 > 0)
+				steps1--;
+			else
+				steps1++;
+
+			digitalWrite(PIN_MOTOR1_STEP, LOW);
+		}
+
+		portEXIT_CRITICAL_ISR(&muxer1);
+	}
+	void IRAM_ATTR timer2ISR()
+	{
+		portENTER_CRITICAL_ISR(&muxer2);
+
+		if (dir_M2 != 0)
+		{
+			// We generate 1us STEP pulse
+			digitalWrite(PIN_MOTOR2_STEP, HIGH);
+			delayMicroseconds(1);
+
+			if (dir_M2 > 0)
+				steps2--;
+			else
+				steps2++;
+
+			digitalWrite(PIN_MOTOR2_STEP, LOW);
+		}
+		portEXIT_CRITICAL_ISR(&muxer2);
+	}
+}
+
+
+void Motors_setup()
+{
+  // setup the timers that drive the pulses of the motors
+	timer1 = timerBegin(0, 40, true);
+	timerAttachInterrupt(timer1, &timer1ISR, true);
+	timerAlarmWrite(timer1, ZERO_SPEED, true);
+
+	timer2 = timerBegin(1, 40, true);
+	timerAttachInterrupt(timer2, &timer2ISR, true);
+	timerAlarmWrite(timer2, ZERO_SPEED, true);
+
+	timerAlarmEnable(timer1);
+	timerAlarmEnable(timer2);
+
+	// setup the stepper motors
+	pinMode(PIN_MOTORS_ENABLE, OUTPUT);
+	digitalWrite(PIN_MOTORS_ENABLE, HIGH);
+
+	// set micro stepping
+#if MICROSTEPPING == 16
+	pinMode(PIN_MOTOR1_MS1, OUTPUT);
+	pinMode(PIN_MOTOR1_MS2, OUTPUT);
+	digitalWrite(PIN_MOTOR1_MS1, HIGH);
+	digitalWrite(PIN_MOTOR1_MS1, HIGH);
+	pinMode(PIN_MOTOR2_MS1, OUTPUT);
+	pinMode(PIN_MOTOR2_MS1, OUTPUT);
+	digitalWrite(PIN_MOTOR2_MS1, HIGH);
+	digitalWrite(PIN_MOTOR2_MS1, HIGH);
+#else
+#error Unsupported MICROSTEPPING value
+#endif
+
+	pinMode(PIN_MOTOR1_STEP, OUTPUT);
+	pinMode(PIN_MOTOR1_DIR, OUTPUT);
+	pinMode(PIN_MOTOR2_STEP, OUTPUT);
+	pinMode(PIN_MOTOR2_DIR, OUTPUT);
+}
+
 // Set speed of Stepper Motor1
 // tspeed could be positive or negative (reverse)
 void setMotorSpeedM1(int16_t tspeed)

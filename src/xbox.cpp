@@ -8,6 +8,7 @@
 #include "globals.h"
 #include "MPU6050.h"
 #include <XboxSeriesXControllerESP32_asukiaaa.hpp>
+#include "Motors.h"
 
 // only bind to my xbox controller
 // XboxSeriesXControllerESP32_asukiaaa::Core xboxController("9c:aa:1b:f2:66:3d");
@@ -71,17 +72,19 @@ void Xbox_loop()
             // The 'Start' button will tell us to start the calibration process
             if (xboxController.xboxNotif.btnStart)
             {
-#ifndef OLD_MPU6050
-                DB_PRINTLN("PID tuning - each dot = 100 readings");
-                mpu.CalibrateAccel(6);
-                mpu.CalibrateGyro(6);
-#ifdef DEBUG
-                mpu.PrintActiveOffsets();
-#endif
-                DB_PRINTLN(" Calibration complete and stored in MPU6050");
-#else
                 MPU6050_calibrate();
-#endif // OLD_MPU6050
+            }
+
+            // the 'Share' button will kill the robot => Sleep
+            if (xboxController.xboxNotif.btnShare)
+            {
+                DB_PRINTLN("Sleep...");
+                // Reset external parameters
+                PID_errorSum = 0;
+                timer_old = millis();
+                setMotorSpeedM1(0);
+                setMotorSpeedM2(0);
+                digitalWrite(PIN_MOTORS_ENABLE, HIGH); // Disable motors
             }
 
 #ifdef XBOX_SERIAL_PLOTTER
