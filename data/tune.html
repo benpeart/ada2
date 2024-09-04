@@ -353,8 +353,8 @@
         }
 
         function initWebSocket() {
-            console.log('Trying to open a WebSocket websocket...');
-            websocket = new WebSocket(gateway, ['arduino']);
+            console.log('Trying to open a websocket...');
+            websocket = new WebSocket(gateway);
             websocket.binaryType = 'arraybuffer';
             websocket.onopen = onOpen;
             websocket.onclose = onClose;
@@ -362,21 +362,20 @@
             websocket.onmessage = onMessage;
         }
 
-        onOpen = function () {
+        var onOpen = function () {
             console.log('Connection opened');
         };
 
-        onClose = function () {
+        var onClose = function () {
             console.log('Connection closed');
             setTimeout(initWebSocket, 2000);
         };
 
-        onError = function (error) {
+        var onError = function (error) {
             console.log('WebSocket Error ', error);
         };
 
-        onMessage = function (event) {
-
+        var onMessage = function (event) {
             console.log('Message from server:', event.data);
             if (typeof (event.data) == 'string') {
                 id = event.data.substr(0, 2);

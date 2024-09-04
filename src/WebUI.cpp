@@ -36,10 +36,18 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
         // send config data to webSocket client
 #ifdef DRIVING_MODE
         SendDriveMode(num);
-#endif  // DRIVING_MODE
-        // !!FIX THIS!! This causes a crash
-//        wsServer.printfAll("kp%.4f", Kp);
-//        wsServer.printfAll("kd%.4f", Kd);
+#endif // DRIVING_MODE
+#if 1
+        char wBuf[63];
+
+        sprintf(wBuf, "kp%.4f", Kp);
+        wsServer.textAll(wBuf);
+        sprintf(wBuf, "kd%.4f", Kd);
+        wsServer.textAll(wBuf);
+#else
+        wsServer.printfAll("kp%.4f", Kp);
+        wsServer.printfAll("kd%.4f", Kd);
+#endif
         break;
     }
 
@@ -74,6 +82,7 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
             {
             case WS_TEXT:
                 char *payload = (char *)data;
+                payload[len] = 0;
                 DB_PRINTF("WebSocket client #%u get Text: %s\n", client->id(), payload);
 
                 switch (payload[0])

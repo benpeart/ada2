@@ -135,9 +135,6 @@ void loop()
 	}
 #endif // JJROBOTS_APP
 
-#ifdef WEBUI
-    WebUI_loop();
-#endif // WEBUI
 	Xbox_loop();
 
 	timer_value = micros();
@@ -313,6 +310,11 @@ void loop()
 #ifdef DEBUG_IMU
 		DB_PRINTLN("");
 #endif // DEBUG_IMU
+
+#ifdef WEBUI
+		// update the 
+		WebUI_loop();
+#endif // WEBUI
 	} // End of new IMU data
 
 	// Medium loop 7.5Hz
