@@ -44,21 +44,23 @@
 //    PRO mode (PRO button). On PRO mode steering and throttle are more aggressive
 //    PAGE2: PID adjustements [optional][dont touch if you dont know what you are doing...;-) ]
 
-#include "defines.h"
 #include <Arduino.h>
-#ifdef JJROBOTS_APP
-#include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiUdp.h>
-#include "OSC.h"
-#endif // JJROBOTS_APP
-#include <Wire.h>
+#include "defines.h"
 #include "MPU6050.h"
 #include "globals.h"
 #include "Motors.h"
 #include "Control.h"
 #include "debug.h"
 #include "xbox.h"
+#ifdef JJROBOTS_APP
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiUdp.h>
+#include "OSC.h"
+#endif // JJROBOTS_APP
+#ifdef WEBUI
+#include "webui.h"
+#endif // WEBUI
 
 #ifdef JJROBOTS_APP
 void initWifiAP()
@@ -72,9 +74,24 @@ void initWifiAP()
 }
 #endif // JJROBOTS_APP
 
+// -- EEPROM
+Preferences preferences;
+#define PREF_VERSION 1 // if setting structure has been changed, count this number up to delete all settings
+#define PREF_NAMESPACE "pref"
+#define PREF_KEY_VERSION "ver"
+
 void setup()
 {
 	Serial.begin(230400);
+
+	// Init EEPROM, if not done before
+	preferences.begin(PREF_NAMESPACE, false); // false = RW-mode
+	if (preferences.getUInt(PREF_KEY_VERSION, 0) != PREF_VERSION)
+	{
+		preferences.clear(); // Remove all preferences under the opened namespace
+		preferences.putUInt(PREF_KEY_VERSION, PREF_VERSION);
+		DB_PRINTF("EEPROM init complete, all preferences deleted, new pref_version: %d\n", PREF_VERSION);
+	}
 
 	MPU6050_setup(); // this has to happen _very_ early with the latest (6.5.0) platform
 #ifdef OLD_MPU6050
@@ -96,6 +113,9 @@ void setup()
 	OSC_init();
 #endif // JJROBOTS_APP
 
+#ifdef WEBUI
+	WebUI_setup();
+#endif // WEBUI
 	Xbox_setup();
 }
 
@@ -115,10 +135,14 @@ void loop()
 	}
 #endif // JJROBOTS_APP
 
+#ifdef WEBUI
+    WebUI_loop();
+#endif // WEBUI
 	Xbox_loop();
 
 	timer_value = micros();
 
+	// should run at 100Hz
 	if (MPU6050_newData())
 	{
 		float dt;

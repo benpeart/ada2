@@ -9,7 +9,11 @@
 #define GLOBALS_H_
 
 #include <Arduino.h>
+#include <Preferences.h> // for storing settings in the ESP32 EEPROM
 #include "esp32-hal-timer.h"
+
+// -- EEPROM
+extern Preferences preferences;
 
 extern long timer_old;
 

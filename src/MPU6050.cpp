@@ -5,10 +5,10 @@
  *      Author: anonymous
  */
 
+#include "defines.h"
 #include "MPU6050.h"
 #include "Wire.h"
 #include "debug.h"
-#include "defines.h"
 #include "globals.h"
 
 #ifndef OLD_MPU6050

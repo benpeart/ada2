@@ -10,7 +10,6 @@
 #include "globals.h"
 #include "esp32-hal-timer.h"
 
-
 long timer_old;
 
 // Angle of the robot (used for stability control)
