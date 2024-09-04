@@ -4,7 +4,9 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWiFiManager.h>
 #include <ESPAsyncWebServer.h>
+#ifdef ELEGANTOTA
 #include <ElegantOTA.h>
+#endif // ELEGANTOTA
 #include <SPIFFS.h>
 #include "debug.h"
 #include "webui.h"
@@ -37,17 +39,20 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
 #ifdef DRIVING_MODE
         SendDriveMode(num);
 #endif // DRIVING_MODE
-#if 1
-        char wBuf[63];
+        AsyncWebSocketMessageBuffer *buffer;
 
-        sprintf(wBuf, "kp%.4f", Kp);
-        wsServer.textAll(wBuf);
-        sprintf(wBuf, "kd%.4f", Kd);
-        wsServer.textAll(wBuf);
-#else
-        wsServer.printfAll("kp%.4f", Kp);
-        wsServer.printfAll("kd%.4f", Kd);
-#endif
+        buffer = wsServer.makeBuffer(16);
+        if (buffer)
+        {
+            snprintf((char *)buffer->get(), buffer->length(), "kp%.4f", Kp);
+            wsServer.textAll(buffer);
+        }
+        buffer = wsServer.makeBuffer(16);
+        if (buffer)
+        {
+            snprintf((char *)buffer->get(), buffer->length(), "kd%.4f", Kd);
+            wsServer.textAll(buffer);
+        }
         break;
     }
 
@@ -194,7 +199,9 @@ bool WebUI_setup()
     httpServer.addHandler(&wsServer);
 
     // Add over the air (OTA) updates
+#ifdef ELEGANTOTA
     ElegantOTA.begin(&httpServer);
+#endif // ELEGANTOTA
 
     // start the server
     httpServer.begin();
@@ -202,7 +209,7 @@ bool WebUI_setup()
     return true;
 }
 
-void WebUI_loop()
+void WebUI_loop(int dt)
 {
     static uint8_t k = 0;
 
@@ -212,23 +219,27 @@ void WebUI_loop()
 
         if (plot.enable)
         {
-            float plotData[15] = {0};
+            AsyncWebSocketMessageBuffer *buffer;
 
-            plotData[0] = (speed_M1 + speed_M2) / 2;
-            plotData[1] = steering;
-#if 0            
-            plotData[2] = pidBalance.Input;
-            plotData[3] = pidBalance.Output;
-            plotData[4] = ypr[0] * 180 / M_PI;
-            plotData[5] = ypr[2] * 180 / M_PI; // pitch and roll are reversed due to how the MPU6050
-            plotData[6] = ypr[1] * 180 / M_PI; // is mounted on the breadboard
-            plotData[10] = encoder_count_left_a;
-            plotData[11] = encoder_count_right_a;
-            plotData[12] = pwm_left;
-            plotData[13] = pwm_right;
-            plotData[14] = dt;
-#endif // 0
-            wsServer.binaryAll((uint8_t *)plotData, sizeof(plotData));
+            buffer = wsServer.makeBuffer(sizeof(float) * 16);
+            if (buffer)
+            {
+                float *plotData = (float *)buffer->get();
+
+                plotData[0] = throttle;
+                plotData[1] = steering;
+                plotData[2] = 0;              // pidBalance.Input;
+                plotData[3] = 0;              // pidBalance.Output;
+                plotData[4] = 0;              // ypr[0] * 180 / M_PI;
+                plotData[5] = angle_adjusted; // ypr[2] * 180 / M_PI; // pitch and roll are reversed due to how the MPU6050
+                plotData[6] = 0;              // ypr[1] * 180 / M_PI; // is mounted on the breadboard
+                plotData[10] = steps1;
+                plotData[11] = steps2;
+                plotData[12] = speed_M1;
+                plotData[13] = speed_M2;
+                plotData[14] = dt;
+                wsServer.binaryAll(buffer);
+            }
         }
     }
     k++;
@@ -238,10 +249,7 @@ void WebUI_loop()
     unsigned long currentTime = millis();
     if ((currentTime - lastTime) < 1000)
         return;
-
     wsServer.cleanupClients();
-
-    // update our time tracking
     lastTime = currentTime;
 }
 

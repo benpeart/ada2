@@ -9,11 +9,12 @@
 #define DEFINES_H_
 
 // turn on/off various features
-// #define OUTPUT_DT
+#define OUTPUT_DT
 // #define OLD_MPU6050
 // #define SERVO
 // #define JJROBOTS_APP
 #define WEBUI
+#define ELEGANTOTA
 
 // debugging support
 // #define DEBUG_IMU

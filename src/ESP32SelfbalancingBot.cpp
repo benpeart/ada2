@@ -123,7 +123,7 @@ void loop()
 {
 	static uint8_t loop_counter;	  // To generate a medium loop 40Hz
 	static uint8_t slow_loop_counter; // slow loop 2Hz
-	static long timer_value;
+	static unsigned long timer_value;
 
 #ifdef JJROBOTS_APP
 	OSC_MsgRead();
@@ -156,7 +156,7 @@ void loop()
 
 #ifdef OUTPUT_DT
 		DB_PRINT(">dt (Hz):");
-		DB_PRINTLN(dt * 10000);
+		DB_PRINTLN(dt);
 #endif // OUTPUT_DT
 
 #ifndef OLD_MPU6050
@@ -312,8 +312,8 @@ void loop()
 #endif // DEBUG_IMU
 
 #ifdef WEBUI
-		// update the 
-		WebUI_loop();
+		// update the web tuning page
+		WebUI_loop(dt);
 #endif // WEBUI
 	} // End of new IMU data
 

@@ -15,7 +15,7 @@
 // -- EEPROM
 extern Preferences preferences;
 
-extern long timer_old;
+extern unsigned long timer_old;
 
 // Angle of the robot (used for stability control)
 extern float angle_adjusted;            // +90 degrees leaning forward, -90 degrees leaning backward
