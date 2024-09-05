@@ -23,7 +23,7 @@ bool settingsChanged = false;
 struct
 {
     boolean enable = 0; // Enable sending data
-    uint8_t prescaler = 4;
+    uint8_t prescaler = 8;
 } plot;
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
@@ -35,24 +35,29 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
     {
         DB_PRINTF("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
 
+        // discard messages if queue is full rather than closing the connection
+        client->setCloseClientOnQueueFull(false);
+
         // send config data to webSocket client
-#ifdef DRIVING_MODE
-        SendDriveMode(num);
-#endif // DRIVING_MODE
+        // !!!FIX THIS!!! not sure why this doesn't work, sending it later with the plot data works fine
+#if 0
         AsyncWebSocketMessageBuffer *buffer;
 
         buffer = wsServer.makeBuffer(16);
         if (buffer)
         {
             snprintf((char *)buffer->get(), buffer->length(), "kp%.4f", Kp);
+            DB_PRINTF("Sending Kp: %s\n", (char *)buffer->get());
             wsServer.textAll(buffer);
         }
         buffer = wsServer.makeBuffer(16);
         if (buffer)
         {
             snprintf((char *)buffer->get(), buffer->length(), "kd%.4f", Kd);
+            DB_PRINTF("Sending Kd: %s\n", (char *)buffer->get());
             wsServer.textAll(buffer);
         }
+#endif
         break;
     }
 
@@ -217,7 +222,7 @@ void WebUI_loop(int dt)
     {
         k = 0;
 
-        if (plot.enable)
+        if (wsServer.availableForWriteAll() & plot.enable)
         {
             AsyncWebSocketMessageBuffer *buffer;
 

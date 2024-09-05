@@ -58,10 +58,10 @@
                     <legend>Plot control</legend>
 
                     Sample rate [Hz]:<br />
-                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="8" checked>25
-                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="4">50
-                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="2">100
-                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="1">200<br /><br />
+                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="8" checked>12
+                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="4">25
+                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="2">50
+                    <input type="radio" id="sr" name="sampleRate" onclick=onSampleRate(this); value="1">100<br /><br />
 
                     Signals to plot<br />
                     <input type="checkbox" name="plotOption" onchange=PlotOption(this); checked>Speed input<br />
@@ -88,28 +88,28 @@
                     <table>
                         <tr>
                             <td>Proportional gain:</td>
-                            <td><input type="range" id="kp" oninput=onTune(this); min="0" max="32" value="21" step="0.5"
-                                    class="slider"></td>
-                            <td><span id="kp_value">1</span></td>
+                            <td><input type="range" id="kp" oninput=onTune(this); min="0" max="1" value="0.32"
+                                    step="0.01" class="slider"></td>
+                            <td><span id="kp_value">0.32</span></td>
                         </tr>
-
+                        <!--
                         <tr>
                             <td>Integral gain:</td>
                             <td><input type="range" id="ki" oninput=onTune(this); min="0" max="256" value="140" step="2"
                                     class="slider"></td>
                             <td><span id="ki_value">0.05</span></td>
                         </tr>
-
+-->
                         <tr>
                             <td>Derivative gain:</td>
-                            <td><input type="range" id="kd" oninput=onTune(this); min="0" max="4" value="0.8" step="0.1"
-                                    class="slider"></td>
-                            <td><span id="kd_value">0.25</span></td>
+                            <td><input type="range" id="kd" oninput=onTune(this); min="0" max="1" value="0.08"
+                                    step="0.01" class="slider"></td>
+                            <td><span id="kd_value">0.08</span></td>
                         </tr>
                     </table>
                 </fieldset>
             </td>
-
+            <!--
             <td style="vertical-align: top;">
                 <fieldset style="width:300px;">
                     <legend>Mode</legend>
@@ -122,7 +122,7 @@
                     <input type="radio" id="mc" name="mode" onclick=onMode(this);>Calibrate</br>
                 </fieldset><br /><br />
             </td>
-
+-->
         </tr>
     </table>
     <ul>
@@ -344,7 +344,6 @@
         }
 
         // open a websocket to the host
-        var gateway = `ws://${window.location.hostname}/ws`;
         var websocket;
         window.addEventListener('load', onLoad);
 
@@ -353,7 +352,8 @@
         }
 
         function initWebSocket() {
-            console.log('Trying to open a websocket...');
+            var gateway = `ws://${window.location.hostname}/ws`;
+            console.log('Trying to open a websocket to ', gateway);
             websocket = new WebSocket(gateway);
             websocket.binaryType = 'arraybuffer';
             websocket.onopen = onOpen;

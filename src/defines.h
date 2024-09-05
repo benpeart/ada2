@@ -9,7 +9,7 @@
 #define DEFINES_H_
 
 // turn on/off various features
-#define OUTPUT_DT
+// #define OUTPUT_DT
 // #define OLD_MPU6050
 // #define SERVO
 // #define JJROBOTS_APP
@@ -57,7 +57,7 @@
 #define MAX_STEERING_PRO 260    // Max recommended value: 280
 #define MAX_TARGET_ANGLE_PRO 26 // Max recommended value: 32
 
-// Default control terms for ADA 2
+// Default control terms for Ada
 #define KP 0.32 // 0.32
 #define KD 0.08 // 0.050
 #define KP_THROTTLE 0.080

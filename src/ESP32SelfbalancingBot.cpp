@@ -156,7 +156,7 @@ void loop()
 
 #ifdef OUTPUT_DT
 		DB_PRINT(">dt (Hz):");
-		DB_PRINTLN(dt);
+		DB_PRINTLN(1 / dt);
 #endif // OUTPUT_DT
 
 #ifndef OLD_MPU6050
@@ -313,7 +313,7 @@ void loop()
 
 #ifdef WEBUI
 		// update the web tuning page
-		WebUI_loop(dt);
+		WebUI_loop(1 / dt);
 #endif // WEBUI
 	} // End of new IMU data
 
